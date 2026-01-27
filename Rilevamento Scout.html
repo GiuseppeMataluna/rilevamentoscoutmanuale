@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scout Volley Prototipo v1.4</title>
+    <style>
+        body { font-family: sans-serif; background: #f5f5f5; margin: 20px; }
+        h2 { margin-top: 30px; }
+        .row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .box { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 0 5px rgba(0,0,0,0.1); flex: 1; min-width: 320px; }
+        
+        /* Tabelle Statistiche Live */
+        .stats-container { overflow-x: auto; margin-top: 15px; border-top: 2px solid #eee; padding-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        td, th { border: 1px solid #ccc; padding: 4px 2px; text-align: center; }
+        th { background: #f8f9fa; font-size: 9px; }
+        .stat-win-col { color: #155724; background: #d4edda; font-weight: bold; } /* Verde Scuro */
+        .stat-err-col { color: #721c24; background: #f8d7da; font-weight: bold; } /* Rosso Scuro */
+        .stat-total { background: #e9ecef; font-weight: bold; font-size: 11px; }
+
+        .score { font-size: 48px; font-weight: bold; text-align: center; }
+        .set-label { text-align: center; font-size: 18px; color: #666; font-weight: bold; margin-bottom: 5px; }
+        
+        button { padding: 8px 12px; margin: 4px 2px; cursor: pointer; }
+        .event-btn { width: 50px; font-weight: bold; }
+        .point-btn { background: #28a745; color: white; border: none; }
+        .error-btn { background: #dc3545; color: white; border: none; }
+        
+        /* Timeline grafica */
+        .timeline-container { max-height: 400px; overflow-y: auto; background: white; border-radius: 6px; padding: 20px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+        .timeline { position: relative; padding: 20px 0; }
+        .timeline::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: #ddd; transform: translateX(-1px); }
+        .timeline-item { display: flex; margin-bottom: 15px; position: relative; align-items: center; }
+        .timeline-item.team-a { justify-content: flex-start; }
+        .timeline-item.team-b { justify-content: flex-end; }
+        .action-card { background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 10px; width: 45%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .team-b .action-card { border-color: #dc3545; }
+        .action-score { font-size: 20px; font-weight: bold; color: #007bff; }
+        .team-b .action-score { color: #dc3545; }
+        
+        /* Undo Button */
+        .undo-btn { display: flex; justify-content: center; margin: 20px 0; }
+        .undo-btn button { background: #ffc107; color: #000; border: 2px solid #ff9800; border-radius: 8px; padding: 12px 24px; font-weight: bold; }
+
+        .save-controls { background: #fff3cd; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #ffc107; }
+        #infoModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+        #infoModal > div { background: white; margin: 50px auto; padding: 30px; max-width: 800px; border-radius: 10px; }
+        .credits { text-align: center; color: #666; font-size: 14px; margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 3px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>Scout Volley Prototipo v1.4 <button onclick="showInfo()" style="font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; padding: 4px 10px;">ℹ️ Info</button></h1>
+
+    <div id="infoModal">
+        <div>
+            <h2>Scout Volley Prototipo v1.4</h2>
+            <button onclick="closeInfo()" style="float: right; margin-top: -40px; font-size: 24px; background: none; border: none; cursor: pointer; color: #dc3545;">×</button>
+            <p><strong>Versione Completa:</strong> Statistiche live S(T) e report Excel a 3 fogli.</p>
+            <ul>
+                <li><strong>Statistiche Live:</strong> Ogni punto (A,B,M) ed Errore (EA,EB,I,ED,FP) è tracciato per Set e Totale.</li>
+                <li><strong>Gestione Set:</strong> Punteggio parziale resettabile per ogni set.</li>
+                <li><strong>Export:</strong> JSON completo + Excel con Cronologia, Stats Squadra A e Stats Squadra B.</li>
+            </ul>
+            <hr>
+            <div class="credits"><strong>👨‍💻 Sviluppato da Giuseppe Mataluna</strong></div>
+        </div>
+    </div>
+
+    <div class="save-controls" id="saveControls" style="display: none;">
+        <strong>📱 Gestione Partita</strong><br><br>
+        <button onclick="saveMatchToFile()">💾 Salva JSON</button>
+        <button onclick="document.getElementById('fileInput').click()" style="background: #007bff; color: white;">📂 Carica</button>
+        <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="uploadMatch(event)">
+        <button style="background: #dc3545; color: white;" onclick="resetMatch()">🔄 Nuova</button>
+        <button style="background: #17a2b8; color: white;" onclick="endMatch()">🏁 Termina</button>
+        <button style="background: #6f42c1; color: white;" onclick="nextSet()">🏐 Fine Set</button>
+        <br><br><small>📄 File: <span id="fileName" style="font-weight: bold; color: #007bff;"></span></small>
+    </div>
+
+    <div id="setupArea">
+        <div class="row">
+            <div class="box">
+                <h2>🏐 Squadra A</h2>
+                <input id="teamAName" placeholder="Nome squadra A" style="width: 200px; padding: 8px;"><br><br>
+                <div id="rosterA"></div>
+                <button onclick="addPlayer('A')">➕ Giocatore</button>
+            </div>
+            <div class="box">
+                <h2>🏐 Squadra B</h2>
+                <input id="teamBName" placeholder="Nome squadra B" style="width: 200px; padding: 8px;"><br><br>
+                <div id="rosterB"></div>
+                <button onclick="addPlayer('B')">➕ Giocatore</button>
+            </div>
+        </div>
+        <br>
+        <button onclick="startMatch()" style="background: #28a745; color: white; font-size: 18px; padding: 12px 24px;">▶️ Avvia Partita</button>
+        <button onclick="document.getElementById('fileInputInitial').click()" style="background: #007bff; color: white; font-size: 18px; padding: 12px 24px; margin-left: 10px;">📂 Carica</button>
+        <input type="file" id="fileInputInitial" accept=".json" style="display: none;" onchange="uploadMatch(event)">
+    </div>
+
+    <div id="matchArea" style="display: none;">
+        <div class="set-label">SET <span id="currentSetLabel">1</span></div>
+        <div class="row">
+            <div class="box" style="text-align: center;">
+                <div id="scoreA" class="score">0</div>
+                <div id="nameA" style="font-size: 20px; font-weight: bold;"></div>
+            </div>
+            <div class="box" style="text-align: center;">
+                <div id="scoreB" class="score">0</div>
+                <div id="nameB" style="font-size: 20px; font-weight: bold;"></div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- BOX SQUADRA A -->
+            <div class="box">
+                <select id="playerA" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+                <div>
+                    <strong>🟢 Punti</strong><br>
+                    <button class="event-btn point-btn" onclick="addAction('A','A')">A</button>
+                    <button class="event-btn point-btn" onclick="addAction('A','B')">B</button>
+                    <button class="event-btn point-btn" onclick="addAction('A','M')">M</button>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>🔴 Errori</strong><br>
+                    <button class="event-btn error-btn" onclick="addAction('A','EA')">EA</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','EB')">EB</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','I')">I</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','ED')">ED</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','FP')">FP</button>
+                </div>
+                <div class="stats-container">
+                    <table id="statsLiveA">
+                        <thead>
+                            <tr>
+                                <th>N-Nome</th>
+                                <th class="stat-win-col">A</th><th class="stat-win-col">B</th><th class="stat-win-col">M</th>
+                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th><th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-total">PT</th><th class="stat-total">ER</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BOX SQUADRA B -->
+            <div class="box">
+                <select id="playerB" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+                <div>
+                    <strong>🟢 Punti</strong><br>
+                    <button class="event-btn point-btn" onclick="addAction('B','A')">A</button>
+                    <button class="event-btn point-btn" onclick="addAction('B','B')">B</button>
+                    <button class="event-btn point-btn" onclick="addAction('B','M')">M</button>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>🔴 Errori</strong><br>
+                    <button class="event-btn error-btn" onclick="addAction('B','EA')">EA</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','EB')">EB</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','I')">I</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','ED')">ED</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','FP')">FP</button>
+                </div>
+                <div class="stats-container">
+                    <table id="statsLiveB">
+                        <thead>
+                            <tr>
+                                <th>N-Nome</th>
+                                <th class="stat-win-col">A</th><th class="stat-win-col">B</th><th class="stat-win-col">M</th>
+                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th><th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-total">PT</th><th class="stat-total">ER</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="undoContainer" class="undo-btn" style="display: none;">
+            <button onclick="undoLastAction()">↶ UNDO Ultima Azione</button>
+        </div>
+
+        <h2>📜 Cronologia</h2>
+        <div class="timeline-container">
+            <div class="timeline" id="timeline"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        let currentSet = 1;
+        let score = { A: 0, B: 0 };
+        let matchData = { 
+            teamNames: { A: '', B: '' }, 
+            rosters: { A: [], B: [] }, 
+            actions: [],
+            currentSet: 1
+        };
+        let matchFileName = '';
+
+        function addPlayer(team) {
+            const div = document.createElement('div');
+            div.innerHTML = `<input placeholder="N°" size="3" style="margin: 2px;"> <input placeholder="Nome" style="width: 120px; margin: 2px;">`;
+            document.getElementById(`roster${team}`).appendChild(div);
+        }
+
+        function startMatch() {
+            const nameA = document.getElementById('teamAName').value.trim();
+            const nameB = document.getElementById('teamBName').value.trim();
+            if (!nameA || !nameB) return alert('Inserisci nomi squadre!');
+
+            matchData.teamNames = { A: nameA, B: nameB };
+            const today = new Date();
+            matchFileName = `${nameA}vs${nameB}_${today.getDate()}-${today.getMonth()+1}.json`.replace(/\s/g, '');
+
+            document.getElementById('nameA').innerText = nameA;
+            document.getElementById('nameB').innerText = nameB;
+            document.getElementById('setupArea').style.display = 'none';
+            document.getElementById('matchArea').style.display = 'block';
+            document.getElementById('saveControls').style.display = 'block';
+            document.getElementById('fileName').innerText = matchFileName;
+
+            loadRoster('A'); loadRoster('B');
+            updateLiveStatsUI();
+            saveToLocalStorage();
+        }
+
+        function loadRoster(team) {
+            const container = document.getElementById(`roster${team}`);
+            const select = document.getElementById(`player${team}`);
+            select.innerHTML = '<option value="0">0 - Squadra</option>';
+            matchData.rosters[team] = [{num: '0', name: 'Squadra'}];
+
+            Array.from(container.children).forEach(row => {
+                const num = row.children[0].value.trim();
+                const name = row.children[1].value.trim();
+                if (num) {
+                    matchData.rosters[team].push({num, name});
+                    const opt = document.createElement('option');
+                    opt.value = num;
+                    opt.text = `${num} - ${name}`;
+                    select.appendChild(opt);
+                }
+            });
+        }
+
+        function addAction(team, type) {
+            const opponent = team === 'A' ? 'B' : 'A';
+            const isError = ['EA','EB','I','ED','FP'].includes(type);
+            const scoringTeam = isError ? opponent : team;
+
+            score[scoringTeam]++;
+            document.getElementById(`score${scoringTeam}`).innerText = score[scoringTeam];
+
+            const pSel = document.getElementById(`player${team}`);
+            const action = {
+                set: currentSet, team, type,
+                player: pSel.value,
+                playerText: pSel.options[pSel.selectedIndex].text,
+                scoreA: score.A, scoreB: score.B, scoringTeam
+            };
+
+            matchData.actions.push(action);
+            renderTimelineItem(action);
+            document.getElementById('undoContainer').style.display = 'flex';
+            updateLiveStatsUI();
+            saveToLocalStorage();
+        }
+
+        function renderTimelineItem(a) {
+            const timeline = document.getElementById('timeline');
+            const item = document.createElement('div');
+            item.className = `timeline-item team-${a.scoringTeam.toLowerCase()}`;
+            const dispScore = a.scoringTeam === 'A' ? a.scoreA : a.scoreB;
+            item.innerHTML = `
+                <div class="action-card">
+                    <div class="action-score">Set ${a.set} | ${dispScore}</div>
+                    <div class="action-details"><strong>${a.type}</strong> · ${a.playerText}</div>
+                </div><div class="timeline-dot"></div>`;
+            timeline.appendChild(item);
+            document.querySelector('.timeline-container').scrollTop = timeline.scrollHeight;
+        }
+
+        function updateLiveStatsUI() {
+            ['A', 'B'].forEach(team => {
+                const tbody = document.querySelector(`#statsLive${team} tbody`);
+                tbody.innerHTML = '';
+                matchData.rosters[team].forEach(p => {
+                    const s = getPlayerDeepStats(team, p.num);
+                    if (s.hasData || p.num === '0') {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="text-align:left"><b>${p.num}</b>-${p.name}</td>
+                            <td class="stat-win-col">${s.set.A}(${s.tot.A})</td>
+                            <td class="stat-win-col">${s.set.B}(${s.tot.B})</td>
+                            <td class="stat-win-col">${s.set.M}(${s.tot.M})</td>
+                            <td class="stat-err-col">${s.set.EA}(${s.tot.EA})</td>
+                            <td class="stat-err-col">${s.set.EB}(${s.tot.EB})</td>
+                            <td class="stat-err-col">${s.set.I}(${s.tot.I})</td>
+                            <td class="stat-err-col">${s.set.ED}(${s.tot.ED})</td>
+                            <td class="stat-err-col">${s.set.FP}(${s.tot.FP})</td>
+                            <td class="stat-total">${s.set.pts}(${s.tot.pts})</td>
+                            <td class="stat-total">${s.set.err}(${s.tot.err})</td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                });
+            });
+        }
+
+        function getPlayerDeepStats(team, num) {
+            const types = ['A', 'B', 'M', 'EA', 'EB', 'I', 'ED', 'FP'];
+            let res = { set: { pts: 0, err: 0 }, tot: { pts: 0, err: 0 }, hasData: false };
+            types.forEach(t => { res.set[t] = 0; res.tot[t] = 0; });
+
+            matchData.actions.forEach(a => {
+                if (a.team === team && a.player === num) {
+                    res.hasData = true;
+                    res.tot[a.type]++;
+                    if (a.set === currentSet) res.set[a.type]++;
+                    if (['A','B','M'].includes(a.type)) {
+                        res.tot.pts++; if (a.set === currentSet) res.set.pts++;
+                    } else {
+                        res.tot.err++; if (a.set === currentSet) res.set.err++;
+                    }
+                }
+            });
+            return res;
+        }
+
+        function nextSet() {
+            if (!confirm(`Chiudere Set ${currentSet}?`)) return;
+            currentSet++;
+            matchData.currentSet = currentSet;
+            score = { A: 0, B: 0 };
+            document.getElementById('scoreA').innerText = 0;
+            document.getElementById('scoreB').innerText = 0;
+            document.getElementById('currentSetLabel').innerText = currentSet;
+            updateLiveStatsUI();
+            saveToLocalStorage();
+        }
+
+        function undoLastAction() {
+            if (!matchData.actions.length) return;
+            matchData.actions.pop();
+            const last = matchData.actions[matchData.actions.length - 1];
+            score.A = last ? last.scoreA : 0;
+            score.B = last ? last.scoreB : 0;
+            document.getElementById('scoreA').innerText = score.A;
+            document.getElementById('scoreB').innerText = score.B;
+            const timeline = document.getElementById('timeline');
+            if (timeline.lastChild) timeline.removeChild(timeline.lastChild);
+            updateLiveStatsUI();
+            saveToLocalStorage();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('volleyScout_v14', JSON.stringify({matchData, currentSet, score}));
+        }
+
+        function saveMatchToFile() {
+            const blob = new Blob([JSON.stringify({matchData, currentSet, score}, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = matchFileName; a.click();
+        }
+
+        function endMatch() {
+            if (!confirm('Terminare e scaricare i report?')) return;
+            saveMatchToFile();
+            setTimeout(exportToExcel, 500);
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            
+            // Foglio 1: Cronologia
+            let dCron = [['Set', 'Team', 'Giocatore', 'Azione', 'Punt. A', 'Punt. B']];
+            matchData.actions.forEach(a => dCron.push([a.set, a.team, a.playerText, a.type, a.scoreA, a.scoreB]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dCron), 'Cronologia');
+
+            // Foglio 2 e 3: Statistiche A e B
+            ['A', 'B'].forEach(t => {
+                let dStats = [[`Statistiche Squadra ${t}: ${matchData.teamNames[t]}`], 
+                             ['Num', 'Nome', 'Ace', 'Batt', 'Muro', 'EA', 'EB', 'I', 'ED', 'FP', 'Punti Tot', 'Errori Tot']];
+                matchData.rosters[t].forEach(p => {
+                    const s = getPlayerDeepStats(t, p.num).tot;
+                    dStats.push([p.num, p.name, s.A, s.B, s.M, s.EA, s.EB, s.I, s.ED, s.FP, s.pts, s.err]);
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dStats), `Stats ${t}`);
+            });
+
+            XLSX.writeFile(wb, matchFileName.replace('.json', '.xlsx'));
+        }
+
+        function uploadMatch(event) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const d = JSON.parse(e.target.result);
+                matchData = d.matchData; currentSet = d.currentSet || 1; score = d.score;
+                
+                document.getElementById('teamAName').value = matchData.teamNames.A;
+                document.getElementById('teamBName').value = matchData.teamNames.B;
+                document.getElementById('nameA').innerText = matchData.teamNames.A;
+                document.getElementById('nameB').innerText = matchData.teamNames.B;
+                document.getElementById('scoreA').innerText = score.A;
+                document.getElementById('scoreB').innerText = score.B;
+                document.getElementById('currentSetLabel').innerText = currentSet;
+                
+                // Roster
+                ['A', 'B'].forEach(t => {
+                    const sel = document.getElementById(`player${t}`);
+                    sel.innerHTML = '';
+                    matchData.rosters[t].forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.num; opt.text = `${p.num} - ${p.name}`;
+                        sel.appendChild(opt);
+                    });
+                });
+
+                const tl = document.getElementById('timeline');
+                tl.innerHTML = '';
+                matchData.actions.forEach(renderTimelineItem);
+                
+                document.getElementById('setupArea').style.display = 'none';
+                document.getElementById('matchArea').style.display = 'block';
+                document.getElementById('saveControls').style.display = 'block';
+                updateLiveStatsUI();
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+
+        function resetMatch() { if(confirm('Nuova partita?')) location.reload(); }
+        function showInfo() { document.getElementById('infoModal').style.display = 'block'; }
+        function closeInfo() { document.getElementById('infoModal').style.display = 'none'; }
+
+        // Caricamento automatico da localStorage se presente
+        window.onload = () => {
+            const saved = localStorage.getItem('volleyScout_v14');
+            if (saved && confirm('Recuperare ultima sessione?')) {
+                const d = JSON.parse(saved);
+                matchData = d.matchData; currentSet = d.currentSet; score = d.score;
+                startMatch(); // Questo reinizializza tutto
+                document.getElementById('currentSetLabel').innerText = currentSet;
+                document.getElementById('scoreA').innerText = score.A;
+                document.getElementById('scoreB').innerText = score.B;
+                const tl = document.getElementById('timeline');
+                tl.innerHTML = '';
+                matchData.actions.forEach(renderTimelineItem);
+            }
+        };
+    </script>
+</body>
+</html>
