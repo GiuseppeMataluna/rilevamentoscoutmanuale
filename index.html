@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scout Volley Prototipo v1.4</title>
+    <title>Scout Volley Prototipo v1.5</title>
     <style>
         body { font-family: sans-serif; background: #f5f5f5; margin: 20px; }
         h2 { margin-top: 30px; }
@@ -15,15 +15,15 @@
         table { width: 100%; border-collapse: collapse; font-size: 10px; }
         td, th { border: 1px solid #ccc; padding: 4px 2px; text-align: center; }
         th { background: #f8f9fa; font-size: 9px; }
-        .stat-win-col { color: #155724; background: #d4edda; font-weight: bold; } /* Verde Scuro */
-        .stat-err-col { color: #721c24; background: #f8d7da; font-weight: bold; } /* Rosso Scuro */
+        .stat-win-col { color: #155724; background: #d4edda; font-weight: bold; }
+        .stat-err-col { color: #721c24; background: #f8d7da; font-weight: bold; }
         .stat-total { background: #e9ecef; font-weight: bold; font-size: 11px; }
 
         .score { font-size: 48px; font-weight: bold; text-align: center; }
         .set-label { text-align: center; font-size: 18px; color: #666; font-weight: bold; margin-bottom: 5px; }
         
         button { padding: 8px 12px; margin: 4px 2px; cursor: pointer; }
-        .event-btn { width: 50px; font-weight: bold; }
+        .event-btn { width: 50px; font-weight: bold; font-size: 11px; }
         .point-btn { background: #28a745; color: white; border: none; }
         .error-btn { background: #dc3545; color: white; border: none; }
         
@@ -34,46 +34,152 @@
         .timeline-item { display: flex; margin-bottom: 15px; position: relative; align-items: center; }
         .timeline-item.team-a { justify-content: flex-start; }
         .timeline-item.team-b { justify-content: flex-end; }
-        .action-card { background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 10px; width: 45%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .action-card { background: #fff; border: 2px solid #007bff; border-radius: 8px; padding: 10px; width: 45%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; }
         .team-b .action-card { border-color: #dc3545; }
         .action-score { font-size: 20px; font-weight: bold; color: #007bff; }
         .team-b .action-score { color: #dc3545; }
+        .action-comment { font-size: 12px; color: #666; font-style: italic; margin-top: 5px; background: #f8f9fa; padding: 5px; border-radius: 4px; }
+        .comment-icon { position: absolute; top: 5px; right: 5px; cursor: pointer; font-size: 20px; }
         
         /* Undo Button */
         .undo-btn { display: flex; justify-content: center; margin: 20px 0; }
         .undo-btn button { background: #ffc107; color: #000; border: 2px solid #ff9800; border-radius: 8px; padding: 12px 24px; font-weight: bold; }
 
         .save-controls { background: #fff3cd; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #ffc107; }
-        #infoModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
-        #infoModal > div { background: white; margin: 50px auto; padding: 30px; max-width: 800px; border-radius: 10px; }
+        #infoModal, #commentModal, #ocrModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+        #infoModal > div, #commentModal > div, #ocrModal > div { background: white; margin: 50px auto; padding: 30px; max-width: 800px; border-radius: 10px; }
+        #commentModal > div { max-width: 500px; }
+        #ocrModal > div { max-width: 700px; }
         .credits { text-align: center; color: #666; font-size: 14px; margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 3px solid #007bff; }
+        
+        .ocr-preview { max-width: 100%; border: 2px solid #007bff; border-radius: 8px; margin: 15px 0; }
+        .ocr-progress { background: #e9ecef; height: 30px; border-radius: 15px; overflow: hidden; margin: 10px 0; }
+        .ocr-progress-bar { background: linear-gradient(90deg, #007bff, #0056b3); height: 100%; transition: width 0.3s; text-align: center; color: white; font-weight: bold; line-height: 30px; }
+        .ocr-result { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; max-height: 300px; overflow-y: auto; }
+        .ocr-result pre { margin: 0; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+        .camera-buttons { display: flex; gap: 10px; margin: 15px 0; }
+        .camera-buttons button { flex: 1; padding: 15px; font-size: 16px; border: 2px solid #007bff; background: white; color: #007bff; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .camera-buttons button:hover { background: #007bff; color: white; }
+        
+        .action-section { margin-bottom: 15px; }
+        .action-section strong { display: block; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <h1>Scout Volley Prototipo v1.4 <button onclick="showInfo()" style="font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; padding: 4px 10px;">ℹ️ Info</button></h1>
+    <h1>Scout Volley Prototipo v1.5 <button onclick="showInfo()" style="font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; padding: 4px 10px;">ℹ️ Info</button></h1>
 
     <div id="infoModal">
         <div>
-            <h2>Scout Volley Prototipo v1.4</h2>
+            <h2>Scout Volley Prototipo v1.5</h2>
             <button onclick="closeInfo()" style="float: right; margin-top: -40px; font-size: 24px; background: none; border: none; cursor: pointer; color: #dc3545;">×</button>
-            <p><strong>Versione Completa:</strong> Statistiche live S(T) e report Excel a 3 fogli.</p>
+            <p><strong>Versione Completa:</strong> Statistiche live dettagliate e report Excel a 3 fogli con commenti.</p>
+            
+            <h3>📊 Legenda Azioni</h3>
+            <h4>🟢 Punti (assegnano punto alla propria squadra)</h4>
             <ul>
-                <li><strong>Statistiche Live:</strong> Ogni punto (A,B,M) ed Errore (EA,EB,I,ED,FP) è tracciato per Set e Totale.</li>
-                <li><strong>Gestione Set:</strong> Punteggio parziale resettabile per ogni set.</li>
-                <li><strong>Export:</strong> JSON completo + Excel con Cronologia, Stats Squadra A e Stats Squadra B.</li>
+                <li><strong>A</strong> = Ace (servizio vincente)</li>
+                <li><strong>B</strong> = Battuta vincente</li>
+                <li><strong>M</strong> = Muro vincente</li>
+                <li><strong>PPT</strong> = Punto Primo Tocco</li>
+                <li><strong>PST</strong> = Punto Secondo Tocco</li>
+                <li><strong>PTT</strong> = Punto Terzo Tocco</li>
+            </ul>
+            
+            <h4>🔴 Errori (assegnano punto alla squadra avversaria)</h4>
+            <ul>
+                <li><strong>EA</strong> = Errore in Attacco</li>
+                <li><strong>EB</strong> = Errore in Battuta</li>
+                <li><strong>I</strong> = Invasione</li>
+                <li><strong>ED</strong> = Errore in Difesa</li>
+                <li><strong>FP</strong> = Fallo di Palleggio</li>
+                <li><strong>EPT</strong> = Errore Primo Tocco</li>
+                <li><strong>EST</strong> = Errore Secondo Tocco</li>
+                <li><strong>ETT</strong> = Errore Terzo Tocco</li>
+            </ul>
+            
+            <h3>💬 Commenti</h3>
+            <p>Clicca sulla nuvoletta 💬 in ogni azione della timeline per aggiungere un commento descrittivo.</p>
+            
+            <h3>🔧 Funzionalità</h3>
+            <ul>
+                <li><strong>📷 Caricamento Roster da Foto:</strong> Usa la fotocamera o carica un'immagine dalla galleria per importare automaticamente il roster tramite OCR</li>
+                <li><strong>Statistiche Live:</strong> Ogni azione è tracciata per Set e Totale con formato S(T)</li>
+                <li><strong>Gestione Set:</strong> Punteggio parziale resettabile per ogni set</li>
+                <li><strong>Salvataggio Automatico:</strong> La partita viene salvata automaticamente ad ogni azione nel browser</li>
+                <li><strong>Protezione Dati:</strong> Se chiudi accidentalmente la finestra, i dati rimangono salvati e puoi recuperarli</li>
+                <li><strong>Export:</strong> JSON completo + Excel con Cronologia (inclusi commenti), Stats Squadra A e Stats Squadra B</li>
+                <li><strong>🏁 Termina e Salva:</strong> Scarica i file finali (JSON + Excel) al termine della partita</li>
+                <li><strong>🔄 Nuova Partita:</strong> Ti chiede se vuoi salvare prima di iniziare una nuova partita</li>
             </ul>
             <hr>
             <div class="credits"><strong>👨‍💻 Sviluppato da Giuseppe Mataluna</strong></div>
         </div>
     </div>
 
+    <div id="commentModal">
+        <div>
+            <h3>💬 Aggiungi Commento</h3>
+            <button onclick="closeCommentModal()" style="float: right; margin-top: -40px; font-size: 24px; background: none; border: none; cursor: pointer; color: #dc3545;">×</button>
+            <p id="commentActionInfo" style="background: #e9ecef; padding: 10px; border-radius: 4px; font-weight: bold;"></p>
+            <textarea id="commentText" style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: sans-serif;" placeholder="Inserisci il tuo commento..."></textarea>
+            <br><br>
+            <button onclick="saveComment()" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold;">💾 Salva</button>
+            <button onclick="closeCommentModal()" style="background: #6c757d; color: white; padding: 10px 20px; border: none; border-radius: 4px; margin-left: 10px;">Annulla</button>
+        </div>
+    </div>
+
+    <div id="ocrModal">
+        <div>
+            <h3>📷 Carica Roster da Foto o PDF</h3>
+            <button onclick="closeOcrModal()" style="float: right; margin-top: -40px; font-size: 24px; background: none; border: none; cursor: pointer; color: #dc3545;">×</button>
+            
+            <p style="color: #666;">Scatta una foto del roster o caricala dalla galleria. Supporta immagini (JPG, PNG, GIF, BMP, WEBP, TIFF, HEIC) e PDF. L'OCR estrarrà automaticamente numeri e nomi dei giocatori.</p>
+            
+            <div class="camera-buttons">
+                <button onclick="document.getElementById('cameraInput').click()">
+                    📷 Fotocamera
+                </button>
+                <button onclick="document.getElementById('galleryInput').click()">
+                    🖼️ Galleria
+                </button>
+            </div>
+            
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="processRosterImage(event)">
+            <input type="file" id="galleryInput" accept="image/*,image/jpeg,image/jpg,image/png,image/gif,image/bmp,image/webp,image/tiff,image/heic,application/pdf" style="display: none;" onchange="processRosterImage(event)">
+            
+            <div id="ocrPreviewContainer" style="display: none;">
+                <h4>Anteprima Immagine:</h4>
+                <img id="ocrPreview" class="ocr-preview">
+                
+                <div id="ocrProgressContainer" style="display: none;">
+                    <h4>Analisi in corso...</h4>
+                    <div class="ocr-progress">
+                        <div id="ocrProgressBar" class="ocr-progress-bar">0%</div>
+                    </div>
+                </div>
+                
+                <div id="ocrResultContainer" style="display: none;">
+                    <h4>Testo Estratto:</h4>
+                    <div class="ocr-result">
+                        <pre id="ocrText"></pre>
+                    </div>
+                    
+                    <h4>Giocatori Rilevati:</h4>
+                    <div id="ocrPlayers" class="ocr-result"></div>
+                    
+                    <button onclick="importOcrPlayers()" style="background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-weight: bold; margin-top: 10px;">✅ Importa Giocatori</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="save-controls" id="saveControls" style="display: none;">
-        <strong>📱 Gestione Partita</strong><br><br>
+        <strong>📱 Gestione Partita</strong> <span id="autoSaveIndicator" style="color: #28a745; font-size: 12px;">● Salvataggio automatico attivo</span><br><br>
         <button onclick="saveMatchToFile()">💾 Salva JSON</button>
         <button onclick="document.getElementById('fileInput').click()" style="background: #007bff; color: white;">📂 Carica</button>
         <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="uploadMatch(event)">
         <button style="background: #dc3545; color: white;" onclick="resetMatch()">🔄 Nuova</button>
-        <button style="background: #17a2b8; color: white;" onclick="endMatch()">🏁 Termina</button>
+        <button style="background: #17a2b8; color: white;" onclick="endMatch()">🏁 Termina e Salva</button>
         <button style="background: #6f42c1; color: white;" onclick="nextSet()">🏐 Fine Set</button>
         <br><br><small>📄 File: <span id="fileName" style="font-weight: bold; color: #007bff;"></span></small>
     </div>
@@ -85,12 +191,14 @@
                 <input id="teamAName" placeholder="Nome squadra A" style="width: 200px; padding: 8px;"><br><br>
                 <div id="rosterA"></div>
                 <button onclick="addPlayer('A')">➕ Giocatore</button>
+                <button onclick="openOcrModal('A')" style="background: #007bff; color: white; margin-left: 10px;">📷 Foto Roster</button>
             </div>
             <div class="box">
                 <h2>🏐 Squadra B</h2>
                 <input id="teamBName" placeholder="Nome squadra B" style="width: 200px; padding: 8px;"><br><br>
                 <div id="rosterB"></div>
                 <button onclick="addPlayer('B')">➕ Giocatore</button>
+                <button onclick="openOcrModal('B')" style="background: #007bff; color: white; margin-left: 10px;">📷 Foto Roster</button>
             </div>
         </div>
         <br>
@@ -116,27 +224,47 @@
             <!-- BOX SQUADRA A -->
             <div class="box">
                 <select id="playerA" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
-                <div>
-                    <strong>🟢 Punti</strong><br>
+                
+                <div class="action-section">
+                    <strong>🟢 Punti Base</strong><br>
                     <button class="event-btn point-btn" onclick="addAction('A','A')">A</button>
                     <button class="event-btn point-btn" onclick="addAction('A','B')">B</button>
                     <button class="event-btn point-btn" onclick="addAction('A','M')">M</button>
                 </div>
-                <div style="margin-top: 10px;">
-                    <strong>🔴 Errori</strong><br>
+                
+                <div class="action-section">
+                    <strong>🟢 Punti per Tocco</strong><br>
+                    <button class="event-btn point-btn" onclick="addAction('A','PPT')">PPT</button>
+                    <button class="event-btn point-btn" onclick="addAction('A','PST')">PST</button>
+                    <button class="event-btn point-btn" onclick="addAction('A','PTT')">PTT</button>
+                </div>
+                
+                <div class="action-section">
+                    <strong>🔴 Errori Base</strong><br>
                     <button class="event-btn error-btn" onclick="addAction('A','EA')">EA</button>
                     <button class="event-btn error-btn" onclick="addAction('A','EB')">EB</button>
                     <button class="event-btn error-btn" onclick="addAction('A','I')">I</button>
                     <button class="event-btn error-btn" onclick="addAction('A','ED')">ED</button>
                     <button class="event-btn error-btn" onclick="addAction('A','FP')">FP</button>
                 </div>
+                
+                <div class="action-section">
+                    <strong>🔴 Errori per Tocco</strong><br>
+                    <button class="event-btn error-btn" onclick="addAction('A','EPT')">EPT</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','EST')">EST</button>
+                    <button class="event-btn error-btn" onclick="addAction('A','ETT')">ETT</button>
+                </div>
+                
                 <div class="stats-container">
                     <table id="statsLiveA">
                         <thead>
                             <tr>
                                 <th>N-Nome</th>
                                 <th class="stat-win-col">A</th><th class="stat-win-col">B</th><th class="stat-win-col">M</th>
-                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th><th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-win-col">PPT</th><th class="stat-win-col">PST</th><th class="stat-win-col">PTT</th>
+                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th>
+                                <th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-err-col">EPT</th><th class="stat-err-col">EST</th><th class="stat-err-col">ETT</th>
                                 <th class="stat-total">PT</th><th class="stat-total">ER</th>
                             </tr>
                         </thead>
@@ -148,27 +276,47 @@
             <!-- BOX SQUADRA B -->
             <div class="box">
                 <select id="playerB" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
-                <div>
-                    <strong>🟢 Punti</strong><br>
+                
+                <div class="action-section">
+                    <strong>🟢 Punti Base</strong><br>
                     <button class="event-btn point-btn" onclick="addAction('B','A')">A</button>
                     <button class="event-btn point-btn" onclick="addAction('B','B')">B</button>
                     <button class="event-btn point-btn" onclick="addAction('B','M')">M</button>
                 </div>
-                <div style="margin-top: 10px;">
-                    <strong>🔴 Errori</strong><br>
+                
+                <div class="action-section">
+                    <strong>🟢 Punti per Tocco</strong><br>
+                    <button class="event-btn point-btn" onclick="addAction('B','PPT')">PPT</button>
+                    <button class="event-btn point-btn" onclick="addAction('B','PST')">PST</button>
+                    <button class="event-btn point-btn" onclick="addAction('B','PTT')">PTT</button>
+                </div>
+                
+                <div class="action-section">
+                    <strong>🔴 Errori Base</strong><br>
                     <button class="event-btn error-btn" onclick="addAction('B','EA')">EA</button>
                     <button class="event-btn error-btn" onclick="addAction('B','EB')">EB</button>
                     <button class="event-btn error-btn" onclick="addAction('B','I')">I</button>
                     <button class="event-btn error-btn" onclick="addAction('B','ED')">ED</button>
                     <button class="event-btn error-btn" onclick="addAction('B','FP')">FP</button>
                 </div>
+                
+                <div class="action-section">
+                    <strong>🔴 Errori per Tocco</strong><br>
+                    <button class="event-btn error-btn" onclick="addAction('B','EPT')">EPT</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','EST')">EST</button>
+                    <button class="event-btn error-btn" onclick="addAction('B','ETT')">ETT</button>
+                </div>
+                
                 <div class="stats-container">
                     <table id="statsLiveB">
                         <thead>
                             <tr>
                                 <th>N-Nome</th>
                                 <th class="stat-win-col">A</th><th class="stat-win-col">B</th><th class="stat-win-col">M</th>
-                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th><th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-win-col">PPT</th><th class="stat-win-col">PST</th><th class="stat-win-col">PTT</th>
+                                <th class="stat-err-col">EA</th><th class="stat-err-col">EB</th><th class="stat-err-col">I</th>
+                                <th class="stat-err-col">ED</th><th class="stat-err-col">FP</th>
+                                <th class="stat-err-col">EPT</th><th class="stat-err-col">EST</th><th class="stat-err-col">ETT</th>
                                 <th class="stat-total">PT</th><th class="stat-total">ER</th>
                             </tr>
                         </thead>
@@ -189,6 +337,8 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         let currentSet = 1;
         let score = { A: 0, B: 0 };
@@ -199,6 +349,9 @@
             currentSet: 1
         };
         let matchFileName = '';
+        let currentCommentIndex = -1;
+        let currentOcrTeam = '';
+        let extractedPlayers = [];
 
         function addPlayer(team) {
             const div = document.createElement('div');
@@ -248,7 +401,8 @@
 
         function addAction(team, type) {
             const opponent = team === 'A' ? 'B' : 'A';
-            const isError = ['EA','EB','I','ED','FP'].includes(type);
+            const errorTypes = ['EA','EB','I','ED','FP','EPT','EST','ETT'];
+            const isError = errorTypes.includes(type);
             const scoringTeam = isError ? opponent : team;
 
             score[scoringTeam]++;
@@ -259,28 +413,318 @@
                 set: currentSet, team, type,
                 player: pSel.value,
                 playerText: pSel.options[pSel.selectedIndex].text,
-                scoreA: score.A, scoreB: score.B, scoringTeam
+                scoreA: score.A, scoreB: score.B, scoringTeam,
+                comment: ''
             };
 
             matchData.actions.push(action);
-            renderTimelineItem(action);
+            renderTimelineItem(action, matchData.actions.length - 1);
             document.getElementById('undoContainer').style.display = 'flex';
             updateLiveStatsUI();
             saveToLocalStorage();
         }
 
-        function renderTimelineItem(a) {
+        function renderTimelineItem(a, index) {
             const timeline = document.getElementById('timeline');
             const item = document.createElement('div');
             item.className = `timeline-item team-${a.scoringTeam.toLowerCase()}`;
+            item.id = `timeline-item-${index}`;
             const dispScore = a.scoringTeam === 'A' ? a.scoreA : a.scoreB;
+            
+            let commentHtml = '';
+            if (a.comment) {
+                commentHtml = `<div class="action-comment">💬 ${a.comment}</div>`;
+            }
+            
             item.innerHTML = `
                 <div class="action-card">
+                    <span class="comment-icon" onclick="openCommentModal(${index})" title="Aggiungi/Modifica Commento">💬</span>
                     <div class="action-score">Set ${a.set} | ${dispScore}</div>
                     <div class="action-details"><strong>${a.type}</strong> · ${a.playerText}</div>
+                    ${commentHtml}
                 </div><div class="timeline-dot"></div>`;
             timeline.appendChild(item);
             document.querySelector('.timeline-container').scrollTop = timeline.scrollHeight;
+        }
+
+        function openCommentModal(index) {
+            currentCommentIndex = index;
+            const action = matchData.actions[index];
+            document.getElementById('commentActionInfo').innerText = 
+                `Set ${action.set} - ${action.type} - ${action.playerText} (${action.scoreA}-${action.scoreB})`;
+            document.getElementById('commentText').value = action.comment || '';
+            document.getElementById('commentModal').style.display = 'block';
+        }
+
+        function closeCommentModal() {
+            document.getElementById('commentModal').style.display = 'none';
+            currentCommentIndex = -1;
+        }
+
+        function saveComment() {
+            if (currentCommentIndex === -1) return;
+            const comment = document.getElementById('commentText').value.trim();
+            matchData.actions[currentCommentIndex].comment = comment;
+            
+            // Aggiorna la visualizzazione nella timeline
+            const timelineItem = document.getElementById(`timeline-item-${currentCommentIndex}`);
+            const actionCard = timelineItem.querySelector('.action-card');
+            let existingComment = actionCard.querySelector('.action-comment');
+            
+            if (comment) {
+                if (existingComment) {
+                    existingComment.innerHTML = `💬 ${comment}`;
+                } else {
+                    const commentDiv = document.createElement('div');
+                    commentDiv.className = 'action-comment';
+                    commentDiv.innerHTML = `💬 ${comment}`;
+                    actionCard.appendChild(commentDiv);
+                }
+            } else {
+                if (existingComment) existingComment.remove();
+            }
+            
+            saveToLocalStorage();
+            closeCommentModal();
+        }
+
+        function openOcrModal(team) {
+            currentOcrTeam = team;
+            document.getElementById('ocrModal').style.display = 'block';
+            document.getElementById('ocrPreviewContainer').style.display = 'none';
+        }
+
+        function closeOcrModal() {
+            document.getElementById('ocrModal').style.display = 'none';
+            currentOcrTeam = '';
+            extractedPlayers = [];
+        }
+
+        function processRosterImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Controlla se è un PDF
+            if (file.type === 'application/pdf') {
+                processPdfFile(file);
+            } else {
+                // Processa come immagine
+                processImageFile(file);
+            }
+        }
+
+        function processImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('ocrPreview');
+                img.src = e.target.result;
+                document.getElementById('ocrPreviewContainer').style.display = 'block';
+                document.getElementById('ocrProgressContainer').style.display = 'block';
+                document.getElementById('ocrResultContainer').style.display = 'none';
+
+                // Avvia OCR
+                performOCR(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processPdfFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const typedArray = new Uint8Array(e.target.result);
+                
+                // Configura PDF.js
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                
+                document.getElementById('ocrPreviewContainer').style.display = 'block';
+                document.getElementById('ocrProgressContainer').style.display = 'block';
+                document.getElementById('ocrResultContainer').style.display = 'none';
+                
+                const progressBar = document.getElementById('ocrProgressBar');
+                progressBar.style.width = '30%';
+                progressBar.innerText = 'Caricamento PDF...';
+
+                // Carica il PDF
+                pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
+                    progressBar.style.width = '50%';
+                    progressBar.innerText = 'Conversione pagina 1...';
+                    
+                    // Prendi la prima pagina
+                    pdf.getPage(1).then(function(page) {
+                        const scale = 2.0; // Scala per qualità migliore
+                        const viewport = page.getViewport({ scale: scale });
+                        
+                        // Crea canvas
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        
+                        // Renderizza la pagina
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: viewport
+                        };
+                        
+                        page.render(renderContext).promise.then(function() {
+                            // Converti canvas in immagine
+                            const imageData = canvas.toDataURL('image/png');
+                            
+                            // Mostra l'anteprima
+                            const img = document.getElementById('ocrPreview');
+                            img.src = imageData;
+                            
+                            progressBar.style.width = '60%';
+                            progressBar.innerText = 'Analisi testo...';
+                            
+                            // Avvia OCR sull'immagine estratta
+                            performOCR(imageData);
+                        });
+                    });
+                }).catch(function(error) {
+                    alert('Errore nel caricamento del PDF: ' + error.message);
+                    document.getElementById('ocrProgressContainer').style.display = 'none';
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function performOCR(imageData) {
+            Tesseract.recognize(
+                imageData,
+                'ita+eng',
+                {
+                    logger: info => {
+                        if (info.status === 'recognizing text') {
+                            const progress = Math.round(60 + (info.progress * 40)); // Da 60% a 100%
+                            document.getElementById('ocrProgressBar').style.width = progress + '%';
+                            document.getElementById('ocrProgressBar').innerText = progress + '%';
+                        }
+                    }
+                }
+            ).then(({ data: { text } }) => {
+                document.getElementById('ocrProgressContainer').style.display = 'none';
+                document.getElementById('ocrText').innerText = text;
+                
+                // Estrai giocatori dal testo
+                extractedPlayers = parseRosterText(text);
+                displayExtractedPlayers();
+                
+                document.getElementById('ocrResultContainer').style.display = 'block';
+            }).catch(err => {
+                alert('Errore nell\'analisi dell\'immagine: ' + err.message);
+                document.getElementById('ocrProgressContainer').style.display = 'none';
+            });
+        }
+
+        function parseRosterText(text) {
+            const lines = text.split('\n');
+            const players = [];
+            
+            // Pattern migliorati per trovare numero seguito da nome
+            const patterns = [
+                /(\d{1,2})\s+([A-Za-zÀ-ÿ'\-]{2,}\s+[A-Za-zÀ-ÿ'\-]{2,})/g,  // Nome e cognome completo
+                /(\d{1,2})\s*[\.:\-\)]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g,  // Con separatori vari
+                /^(\d{1,2})\s+(.+)$/gm,  // Linee che iniziano con numero
+                /N[°o]?\s*(\d{1,2})\s+([A-Za-zÀ-ÿ'\-\s]{3,})/gi,  // Con "N°" o "No"
+                /(\d{1,2})\s*[-–—]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g  // Trattini vari
+            ];
+            
+            // Prova tutti i pattern
+            for (const pattern of patterns) {
+                let match;
+                while ((match = pattern.exec(text)) !== null) {
+                    const num = match[1].trim();
+                    let name = match[2].trim();
+                    
+                    // Pulisci il nome
+                    name = name
+                        .replace(/\s+/g, ' ')  // Normalizza spazi multipli
+                        .replace(/[^\w\sÀ-ÿ'\-]/g, '')  // Rimuovi caratteri strani
+                        .trim();
+                    
+                    // Valida il nome
+                    if (name.length >= 3 && 
+                        /^[A-Za-zÀ-ÿ'\-\s]+$/.test(name) &&
+                        parseInt(num) >= 0 && parseInt(num) <= 99) {
+                        
+                        // Verifica che non sia già presente
+                        if (!players.some(p => p.num === num)) {
+                            players.push({ num, name });
+                        }
+                    }
+                }
+            }
+            
+            // Se non trova niente con i pattern, prova analisi riga per riga
+            if (players.length === 0) {
+                lines.forEach(line => {
+                    line = line.trim();
+                    // Cerca numero all'inizio della riga
+                    const simpleMatch = line.match(/^(\d{1,2})\s+(.+)$/);
+                    if (simpleMatch) {
+                        const num = simpleMatch[1];
+                        let name = simpleMatch[2].trim();
+                        name = name.replace(/[^\w\sÀ-ÿ'\-]/g, '').trim();
+                        
+                        if (name.length >= 3 && !players.some(p => p.num === num)) {
+                            players.push({ num, name });
+                        }
+                    }
+                });
+            }
+            
+            // Ordina per numero
+            players.sort((a, b) => parseInt(a.num) - parseInt(b.num));
+            
+            return players;
+        }
+
+        function displayExtractedPlayers() {
+            const container = document.getElementById('ocrPlayers');
+            if (extractedPlayers.length === 0) {
+                container.innerHTML = '<p style="color: #dc3545;">Nessun giocatore rilevato. Prova a scattare una foto più nitida o inserisci manualmente.</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr><th style="border: 1px solid #ccc; padding: 8px;">N°</th><th style="border: 1px solid #ccc; padding: 8px;">Nome</th><th style="border: 1px solid #ccc; padding: 8px;">Azione</th></tr>';
+            
+            extractedPlayers.forEach((player, index) => {
+                html += `<tr>
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><input type="text" value="${player.num}" id="ocrNum${index}" style="width: 50px; text-align: center;"></td>
+                    <td style="border: 1px solid #ccc; padding: 8px;"><input type="text" value="${player.name}" id="ocrName${index}" style="width: 100%;"></td>
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><button onclick="removeOcrPlayer(${index})" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">🗑️</button></td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            html += '<p style="margin-top: 10px; color: #666; font-size: 14px;"><em>💡 Puoi modificare i dati prima di importare</em></p>';
+            container.innerHTML = html;
+        }
+
+        function removeOcrPlayer(index) {
+            extractedPlayers.splice(index, 1);
+            displayExtractedPlayers();
+        }
+
+        function importOcrPlayers() {
+            // Aggiorna i dati dai campi input
+            extractedPlayers.forEach((player, index) => {
+                player.num = document.getElementById(`ocrNum${index}`).value.trim();
+                player.name = document.getElementById(`ocrName${index}`).value.trim();
+            });
+            
+            // Aggiungi i giocatori al roster
+            const rosterContainer = document.getElementById(`roster${currentOcrTeam}`);
+            extractedPlayers.forEach(player => {
+                const div = document.createElement('div');
+                div.innerHTML = `<input placeholder="N°" size="3" style="margin: 2px;" value="${player.num}"> <input placeholder="Nome" style="width: 120px; margin: 2px;" value="${player.name}">`;
+                rosterContainer.appendChild(div);
+            });
+            
+            alert(`✅ ${extractedPlayers.length} giocatori importati per Squadra ${currentOcrTeam}!`);
+            closeOcrModal();
         }
 
         function updateLiveStatsUI() {
@@ -296,11 +740,17 @@
                             <td class="stat-win-col">${s.set.A}(${s.tot.A})</td>
                             <td class="stat-win-col">${s.set.B}(${s.tot.B})</td>
                             <td class="stat-win-col">${s.set.M}(${s.tot.M})</td>
+                            <td class="stat-win-col">${s.set.PPT}(${s.tot.PPT})</td>
+                            <td class="stat-win-col">${s.set.PST}(${s.tot.PST})</td>
+                            <td class="stat-win-col">${s.set.PTT}(${s.tot.PTT})</td>
                             <td class="stat-err-col">${s.set.EA}(${s.tot.EA})</td>
                             <td class="stat-err-col">${s.set.EB}(${s.tot.EB})</td>
                             <td class="stat-err-col">${s.set.I}(${s.tot.I})</td>
                             <td class="stat-err-col">${s.set.ED}(${s.tot.ED})</td>
                             <td class="stat-err-col">${s.set.FP}(${s.tot.FP})</td>
+                            <td class="stat-err-col">${s.set.EPT}(${s.tot.EPT})</td>
+                            <td class="stat-err-col">${s.set.EST}(${s.tot.EST})</td>
+                            <td class="stat-err-col">${s.set.ETT}(${s.tot.ETT})</td>
                             <td class="stat-total">${s.set.pts}(${s.tot.pts})</td>
                             <td class="stat-total">${s.set.err}(${s.tot.err})</td>
                         `;
@@ -311,7 +761,8 @@
         }
 
         function getPlayerDeepStats(team, num) {
-            const types = ['A', 'B', 'M', 'EA', 'EB', 'I', 'ED', 'FP'];
+            const types = ['A', 'B', 'M', 'PPT', 'PST', 'PTT', 'EA', 'EB', 'I', 'ED', 'FP', 'EPT', 'EST', 'ETT'];
+            const pointTypes = ['A', 'B', 'M', 'PPT', 'PST', 'PTT'];
             let res = { set: { pts: 0, err: 0 }, tot: { pts: 0, err: 0 }, hasData: false };
             types.forEach(t => { res.set[t] = 0; res.tot[t] = 0; });
 
@@ -320,7 +771,7 @@
                     res.hasData = true;
                     res.tot[a.type]++;
                     if (a.set === currentSet) res.set[a.type]++;
-                    if (['A','B','M'].includes(a.type)) {
+                    if (pointTypes.includes(a.type)) {
                         res.tot.pts++; if (a.set === currentSet) res.set.pts++;
                     } else {
                         res.tot.err++; if (a.set === currentSet) res.set.err++;
@@ -357,7 +808,18 @@
         }
 
         function saveToLocalStorage() {
-            localStorage.setItem('volleyScout_v14', JSON.stringify({matchData, currentSet, score}));
+            localStorage.setItem('volleyScout_v15', JSON.stringify({matchData, currentSet, score}));
+            
+            // Feedback visivo di salvataggio
+            const indicator = document.getElementById('autoSaveIndicator');
+            if (indicator) {
+                indicator.style.color = '#ffc107';
+                indicator.innerHTML = '● Salvando...';
+                setTimeout(() => {
+                    indicator.style.color = '#28a745';
+                    indicator.innerHTML = '● Salvataggio automatico attivo';
+                }, 300);
+            }
         }
 
         function saveMatchToFile() {
@@ -368,26 +830,27 @@
         }
 
         function endMatch() {
-            if (!confirm('Terminare e scaricare i report?')) return;
+            if (!confirm('🏁 TERMINARE LA PARTITA?\n\nVerranno scaricati:\n- File JSON completo\n- Report Excel con statistiche\n\nConfermi?')) return;
             saveMatchToFile();
             setTimeout(exportToExcel, 500);
+            alert('✅ Partita terminata!\nFile salvati correttamente.\n\nPuoi ora iniziare una nuova partita o chiudere l\'applicazione.');
         }
 
         function exportToExcel() {
             const wb = XLSX.utils.book_new();
             
-            // Foglio 1: Cronologia
-            let dCron = [['Set', 'Team', 'Giocatore', 'Azione', 'Punt. A', 'Punt. B']];
-            matchData.actions.forEach(a => dCron.push([a.set, a.team, a.playerText, a.type, a.scoreA, a.scoreB]));
+            // Foglio 1: Cronologia con Commenti
+            let dCron = [['Set', 'Team', 'Giocatore', 'Azione', 'Punt. A', 'Punt. B', 'Commento']];
+            matchData.actions.forEach(a => dCron.push([a.set, a.team, a.playerText, a.type, a.scoreA, a.scoreB, a.comment || '']));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dCron), 'Cronologia');
 
             // Foglio 2 e 3: Statistiche A e B
             ['A', 'B'].forEach(t => {
                 let dStats = [[`Statistiche Squadra ${t}: ${matchData.teamNames[t]}`], 
-                             ['Num', 'Nome', 'Ace', 'Batt', 'Muro', 'EA', 'EB', 'I', 'ED', 'FP', 'Punti Tot', 'Errori Tot']];
+                             ['Num', 'Nome', 'Ace', 'Batt', 'Muro', 'PPT', 'PST', 'PTT', 'EA', 'EB', 'I', 'ED', 'FP', 'EPT', 'EST', 'ETT', 'Punti Tot', 'Errori Tot']];
                 matchData.rosters[t].forEach(p => {
                     const s = getPlayerDeepStats(t, p.num).tot;
-                    dStats.push([p.num, p.name, s.A, s.B, s.M, s.EA, s.EB, s.I, s.ED, s.FP, s.pts, s.err]);
+                    dStats.push([p.num, p.name, s.A, s.B, s.M, s.PPT, s.PST, s.PTT, s.EA, s.EB, s.I, s.ED, s.FP, s.EPT, s.EST, s.ETT, s.pts, s.err]);
                 });
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dStats), `Stats ${t}`);
             });
@@ -422,7 +885,7 @@
 
                 const tl = document.getElementById('timeline');
                 tl.innerHTML = '';
-                matchData.actions.forEach(renderTimelineItem);
+                matchData.actions.forEach((action, index) => renderTimelineItem(action, index));
                 
                 document.getElementById('setupArea').style.display = 'none';
                 document.getElementById('matchArea').style.display = 'block';
@@ -432,23 +895,52 @@
             reader.readAsText(event.target.files[0]);
         }
 
-        function resetMatch() { if(confirm('Nuova partita?')) location.reload(); }
+        function resetMatch() { 
+            if(confirm('Vuoi salvare la partita corrente prima di iniziare una nuova?\n\nPremi OK per salvare, Annulla per scartare.')) {
+                saveMatchToFile();
+                setTimeout(() => {
+                    if(confirm('File salvato! Ora iniziare nuova partita?')) {
+                        localStorage.removeItem('volleyScout_v15');
+                        location.reload();
+                    }
+                }, 300);
+            } else {
+                if(confirm('Sei sicuro di voler scartare questa partita e iniziarne una nuova?')) {
+                    localStorage.removeItem('volleyScout_v15');
+                    location.reload();
+                }
+            }
+        }
+        
         function showInfo() { document.getElementById('infoModal').style.display = 'block'; }
         function closeInfo() { document.getElementById('infoModal').style.display = 'none'; }
+        
+        // Salvataggio automatico prima della chiusura della finestra
+        window.addEventListener('beforeunload', function(e) {
+            if (matchData.actions.length > 0) {
+                // Salva automaticamente nel localStorage
+                saveToLocalStorage();
+                
+                // Mostra avviso di conferma
+                e.preventDefault();
+                e.returnValue = 'Hai una partita in corso. I dati sono salvati automaticamente in locale. Vuoi davvero uscire?';
+                return e.returnValue;
+            }
+        });
 
         // Caricamento automatico da localStorage se presente
         window.onload = () => {
-            const saved = localStorage.getItem('volleyScout_v14');
+            const saved = localStorage.getItem('volleyScout_v15');
             if (saved && confirm('Recuperare ultima sessione?')) {
                 const d = JSON.parse(saved);
                 matchData = d.matchData; currentSet = d.currentSet; score = d.score;
-                startMatch(); // Questo reinizializza tutto
+                startMatch();
                 document.getElementById('currentSetLabel').innerText = currentSet;
                 document.getElementById('scoreA').innerText = score.A;
                 document.getElementById('scoreB').innerText = score.B;
                 const tl = document.getElementById('timeline');
                 tl.innerHTML = '';
-                matchData.actions.forEach(renderTimelineItem);
+                matchData.actions.forEach((action, index) => renderTimelineItem(action, index));
             }
         };
     </script>
