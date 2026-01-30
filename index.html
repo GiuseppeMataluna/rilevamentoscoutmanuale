@@ -102,7 +102,7 @@
             
             <h3>🔧 Funzionalità</h3>
             <ul>
-                <li><strong>📷 Caricamento Roster da Foto:</strong> Usa la fotocamera o carica un'immagine dalla galleria per importare automaticamente il roster tramite OCR</li>
+                <li><strong>📷 Caricamento Roster da Foto/PDF:</strong> Usa la fotocamera o carica file dalla galleria. Supporta tutti i formati immagine (JPG, PNG, GIF, BMP, WEBP, TIFF, HEIC) e PDF. L'OCR estrae automaticamente numeri e nomi</li>
                 <li><strong>Statistiche Live:</strong> Ogni azione è tracciata per Set e Totale con formato S(T)</li>
                 <li><strong>Gestione Set:</strong> Punteggio parziale resettabile per ogni set</li>
                 <li><strong>Salvataggio Automatico:</strong> La partita viene salvata automaticamente ad ogni azione nel browser</li>
@@ -343,6 +343,7 @@
         let currentSet = 1;
         let score = { A: 0, B: 0 };
         let matchData = { 
+            version: '1.5',  // Versione corrente
             teamNames: { A: '', B: '' }, 
             rosters: { A: [], B: [] }, 
             actions: [],
@@ -357,6 +358,29 @@
             const div = document.createElement('div');
             div.innerHTML = `<input placeholder="N°" size="3" style="margin: 2px;"> <input placeholder="Nome" style="width: 120px; margin: 2px;">`;
             document.getElementById(`roster${team}`).appendChild(div);
+        }
+
+        // Funzione per migrare dati da versioni precedenti
+        function migrateMatchData(data) {
+            // Se non ha versione, è vecchia (pre 1.5)
+            if (!data.matchData.version) {
+                console.log('⚠️ Rilevata versione vecchia, migrazione in corso...');
+                data.matchData.version = '1.5';
+                
+                // Assicurati che ogni azione abbia il campo comment
+                data.matchData.actions.forEach(action => {
+                    if (!action.hasOwnProperty('comment')) {
+                        action.comment = '';
+                    }
+                });
+                
+                console.log('✅ Migrazione completata a versione 1.5');
+            }
+            
+            // Eventuali future migrazioni possono essere aggiunte qui
+            // if (data.matchData.version === '1.5') { ... upgrade to 1.6 ... }
+            
+            return data;
         }
 
         function startMatch() {
@@ -861,8 +885,14 @@
         function uploadMatch(event) {
             const reader = new FileReader();
             reader.onload = e => {
-                const d = JSON.parse(e.target.result);
-                matchData = d.matchData; currentSet = d.currentSet || 1; score = d.score;
+                let d = JSON.parse(e.target.result);
+                
+                // Migra i dati se necessario
+                d = migrateMatchData(d);
+                
+                matchData = d.matchData; 
+                currentSet = d.currentSet || 1; 
+                score = d.score;
                 
                 document.getElementById('teamAName').value = matchData.teamNames.A;
                 document.getElementById('teamBName').value = matchData.teamNames.B;
@@ -890,7 +920,13 @@
                 document.getElementById('setupArea').style.display = 'none';
                 document.getElementById('matchArea').style.display = 'block';
                 document.getElementById('saveControls').style.display = 'block';
+                
+                matchFileName = `${matchData.teamNames.A}vs${matchData.teamNames.B}_${new Date().getDate()}-${new Date().getMonth()+1}.json`.replace(/\s/g, '');
+                document.getElementById('fileName').innerText = matchFileName;
+                
                 updateLiveStatsUI();
+                
+                alert('✅ Partita caricata e aggiornata alla versione corrente!');
             };
             reader.readAsText(event.target.files[0]);
         }
@@ -930,10 +966,29 @@
 
         // Caricamento automatico da localStorage se presente
         window.onload = () => {
-            const saved = localStorage.getItem('volleyScout_v15');
+            // Prova prima v1.5, poi v1.4 per compatibilità
+            let saved = localStorage.getItem('volleyScout_v15');
+            let isOldVersion = false;
+            
+            if (!saved) {
+                // Prova a caricare la vecchia versione
+                saved = localStorage.getItem('volleyScout_v14');
+                if (saved) {
+                    isOldVersion = true;
+                    console.log('⚠️ Rilevata sessione dalla versione 1.4');
+                }
+            }
+            
             if (saved && confirm('Recuperare ultima sessione?')) {
-                const d = JSON.parse(saved);
-                matchData = d.matchData; currentSet = d.currentSet; score = d.score;
+                let d = JSON.parse(saved);
+                
+                // Migra i dati se necessario
+                d = migrateMatchData(d);
+                
+                matchData = d.matchData; 
+                currentSet = d.currentSet; 
+                score = d.score;
+                
                 startMatch();
                 document.getElementById('currentSetLabel').innerText = currentSet;
                 document.getElementById('scoreA').innerText = score.A;
@@ -941,6 +996,15 @@
                 const tl = document.getElementById('timeline');
                 tl.innerHTML = '';
                 matchData.actions.forEach((action, index) => renderTimelineItem(action, index));
+                
+                if (isOldVersion) {
+                    // Rimuovi la vecchia versione e salva nella nuova
+                    localStorage.removeItem('volleyScout_v14');
+                    saveToLocalStorage();
+                    alert('✅ Sessione recuperata e aggiornata alla versione 1.5!\n\nOra puoi usare le nuove funzionalità (PPT, PST, PTT, EPT, EST, ETT, commenti e OCR roster).');
+                }
+                
+                console.log('✅ Sessione recuperata e aggiornata alla versione corrente');
             }
         };
     </script>
