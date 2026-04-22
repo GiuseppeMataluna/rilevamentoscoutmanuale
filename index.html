@@ -10,7 +10,6 @@
         .row { display: flex; gap: 20px; flex-wrap: wrap; }
         .box { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 0 5px rgba(0,0,0,0.1); flex: 1; min-width: 320px; }
         
-        /* Tabelle Statistiche Live */
         .stats-container { overflow-x: auto; margin-top: 15px; border-top: 2px solid #eee; padding-top: 10px; }
         table { width: 100%; border-collapse: collapse; font-size: 10px; }
         td, th { border: 1px solid #ccc; padding: 4px 2px; text-align: center; }
@@ -27,7 +26,6 @@
         .point-btn { background: #28a745; color: white; border: none; }
         .error-btn { background: #dc3545; color: white; border: none; }
         
-        /* Timeline grafica */
         .timeline-container { max-height: 400px; overflow-y: auto; background: white; border-radius: 6px; padding: 20px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
         .timeline { position: relative; padding: 20px 0; }
         .timeline::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: #ddd; transform: translateX(-1px); }
@@ -41,7 +39,6 @@
         .action-comment { font-size: 12px; color: #666; font-style: italic; margin-top: 5px; background: #f8f9fa; padding: 5px; border-radius: 4px; }
         .comment-icon { position: absolute; top: 5px; right: 5px; cursor: pointer; font-size: 20px; }
         
-        /* Undo Button */
         .undo-btn { display: flex; justify-content: center; margin: 20px 0; }
         .undo-btn button { background: #ffc107; color: #000; border: 2px solid #ff9800; border-radius: 8px; padding: 12px 24px; font-weight: bold; }
 
@@ -63,10 +60,45 @@
         
         .action-section { margin-bottom: 15px; }
         .action-section strong { display: block; margin-bottom: 5px; }
+
+        /* Banner fine set */
+        #setEndBanner {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        #setEndBanner.visible { display: flex; }
+        #setEndBannerInner {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 50px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            max-width: 420px;
+            width: 90%;
+        }
+        #setEndBannerInner h2 { color: #007bff; font-size: 28px; margin-bottom: 10px; }
+        #setEndBannerInner .set-score { font-size: 48px; font-weight: bold; margin: 15px 0; }
+        #setEndBannerInner .winner-name { font-size: 22px; color: #28a745; font-weight: bold; margin-bottom: 20px; }
+        #setEndBannerInner button { background: #007bff; color: white; border: none; border-radius: 8px; padding: 14px 32px; font-size: 18px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <h1>Scout Volley Prototipo v1.5 <button onclick="showInfo()" style="font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; padding: 4px 10px;">ℹ️ Info</button></h1>
+
+    <!-- Banner automatico fine set -->
+    <div id="setEndBanner">
+        <div id="setEndBannerInner">
+            <h2 id="setEndTitle">🏆 Fine Set</h2>
+            <div class="set-score" id="setEndScore"></div>
+            <div class="winner-name" id="setEndWinner"></div>
+            <button onclick="confirmNextSet()">▶️ Avanti Set <span id="setEndNextNum"></span></button>
+        </div>
+    </div>
 
     <div id="infoModal">
         <div>
@@ -97,6 +129,14 @@
                 <li><strong>ETT</strong> = Errore Terzo Tocco</li>
             </ul>
             
+            <h3>🏐 Regole Set</h3>
+            <ul>
+                <li>Set 1-4: vince chi arriva a <strong>25 punti con almeno 2 di scarto</strong></li>
+                <li>Set 1-4 ai vantaggi: si continua fino a <strong>+2 di differenza</strong> (es. 27-25, 30-28…)</li>
+                <li>5° Set (tie-break): vince chi arriva a <strong>15 punti con almeno 2 di scarto</strong></li>
+                <li>Il banner di fine set appare automaticamente; puoi comunque chiudere manualmente con "🏐 Fine Set"</li>
+            </ul>
+
             <h3>💬 Commenti</h3>
             <p>Clicca sulla nuvoletta 💬 in ogni azione della timeline per aggiungere un commento descrittivo.</p>
             
@@ -343,7 +383,7 @@
         let currentSet = 1;
         let score = { A: 0, B: 0 };
         let matchData = { 
-            version: '1.5',  // Versione corrente
+            version: '1.5',
             teamNames: { A: '', B: '' }, 
             rosters: { A: [], B: [] }, 
             actions: [],
@@ -354,32 +394,75 @@
         let currentOcrTeam = '';
         let extractedPlayers = [];
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // LOGICA FINE SET
+        // Regole ufficiali:
+        //   Set 1-4 → vince chi raggiunge 25 punti con ≥2 di scarto
+        //   Set 5   → vince chi raggiunge 15 punti con ≥2 di scarto
+        //   Ai vantaggi (es. 24-24) si continua fino a +2
+        // ─────────────────────────────────────────────────────────────────────────
+        function checkSetEnd() {
+            const a = score.A;
+            const b = score.B;
+            const minPoints = (currentSet === 5) ? 15 : 25;
+
+            let winner = null;
+            if (a >= minPoints && (a - b) >= 2) {
+                winner = 'A';
+            } else if (b >= minPoints && (b - a) >= 2) {
+                winner = 'B';
+            }
+
+            if (winner) {
+                showSetEndBanner(winner, a, b);
+            }
+        }
+
+        function showSetEndBanner(winner, finalA, finalB) {
+            const winnerName = matchData.teamNames[winner];
+            const setLabel = currentSet === 5 ? '5° Set (Tie-break)' : `Set ${currentSet}`;
+
+            document.getElementById('setEndTitle').innerText = `🏆 Fine ${setLabel}`;
+            document.getElementById('setEndScore').innerText = `${finalA} – ${finalB}`;
+            document.getElementById('setEndWinner').innerText = `Vince ${winnerName}!`;
+            document.getElementById('setEndNextNum').innerText = currentSet + 1;
+            document.getElementById('setEndBanner').classList.add('visible');
+        }
+
+        function confirmNextSet() {
+            document.getElementById('setEndBanner').classList.remove('visible');
+            advanceSet();
+        }
+
+        function advanceSet() {
+            currentSet++;
+            matchData.currentSet = currentSet;
+            score = { A: 0, B: 0 };
+            document.getElementById('scoreA').innerText = 0;
+            document.getElementById('scoreB').innerText = 0;
+            document.getElementById('currentSetLabel').innerText = currentSet;
+            updateLiveStatsUI();
+            saveToLocalStorage();
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         function addPlayer(team) {
             const div = document.createElement('div');
             div.innerHTML = `<input placeholder="N°" size="3" style="margin: 2px;"> <input placeholder="Nome" style="width: 120px; margin: 2px;">`;
             document.getElementById(`roster${team}`).appendChild(div);
         }
 
-        // Funzione per migrare dati da versioni precedenti
         function migrateMatchData(data) {
-            // Se non ha versione, è vecchia (pre 1.5)
             if (!data.matchData.version) {
                 console.log('⚠️ Rilevata versione vecchia, migrazione in corso...');
                 data.matchData.version = '1.5';
-                
-                // Assicurati che ogni azione abbia il campo comment
                 data.matchData.actions.forEach(action => {
                     if (!action.hasOwnProperty('comment')) {
                         action.comment = '';
                     }
                 });
-                
                 console.log('✅ Migrazione completata a versione 1.5');
             }
-            
-            // Eventuali future migrazioni possono essere aggiunte qui
-            // if (data.matchData.version === '1.5') { ... upgrade to 1.6 ... }
-            
             return data;
         }
 
@@ -446,6 +529,9 @@
             document.getElementById('undoContainer').style.display = 'flex';
             updateLiveStatsUI();
             saveToLocalStorage();
+
+            // ── CONTROLLO AUTOMATICO FINE SET ──
+            checkSetEnd();
         }
 
         function renderTimelineItem(a, index) {
@@ -490,7 +576,6 @@
             const comment = document.getElementById('commentText').value.trim();
             matchData.actions[currentCommentIndex].comment = comment;
             
-            // Aggiorna la visualizzazione nella timeline
             const timelineItem = document.getElementById(`timeline-item-${currentCommentIndex}`);
             const actionCard = timelineItem.querySelector('.action-card');
             let existingComment = actionCard.querySelector('.action-comment');
@@ -527,12 +612,9 @@
         function processRosterImage(event) {
             const file = event.target.files[0];
             if (!file) return;
-
-            // Controlla se è un PDF
             if (file.type === 'application/pdf') {
                 processPdfFile(file);
             } else {
-                // Processa come immagine
                 processImageFile(file);
             }
         }
@@ -545,8 +627,6 @@
                 document.getElementById('ocrPreviewContainer').style.display = 'block';
                 document.getElementById('ocrProgressContainer').style.display = 'block';
                 document.getElementById('ocrResultContainer').style.display = 'none';
-
-                // Avvia OCR
                 performOCR(e.target.result);
             };
             reader.readAsDataURL(file);
@@ -556,52 +636,29 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const typedArray = new Uint8Array(e.target.result);
-                
-                // Configura PDF.js
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                
                 document.getElementById('ocrPreviewContainer').style.display = 'block';
                 document.getElementById('ocrProgressContainer').style.display = 'block';
                 document.getElementById('ocrResultContainer').style.display = 'none';
-                
                 const progressBar = document.getElementById('ocrProgressBar');
                 progressBar.style.width = '30%';
                 progressBar.innerText = 'Caricamento PDF...';
 
-                // Carica il PDF
                 pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
                     progressBar.style.width = '50%';
                     progressBar.innerText = 'Conversione pagina 1...';
-                    
-                    // Prendi la prima pagina
                     pdf.getPage(1).then(function(page) {
-                        const scale = 2.0; // Scala per qualità migliore
+                        const scale = 2.0;
                         const viewport = page.getViewport({ scale: scale });
-                        
-                        // Crea canvas
                         const canvas = document.createElement('canvas');
                         const context = canvas.getContext('2d');
                         canvas.height = viewport.height;
                         canvas.width = viewport.width;
-                        
-                        // Renderizza la pagina
-                        const renderContext = {
-                            canvasContext: context,
-                            viewport: viewport
-                        };
-                        
-                        page.render(renderContext).promise.then(function() {
-                            // Converti canvas in immagine
+                        page.render({ canvasContext: context, viewport: viewport }).promise.then(function() {
                             const imageData = canvas.toDataURL('image/png');
-                            
-                            // Mostra l'anteprima
-                            const img = document.getElementById('ocrPreview');
-                            img.src = imageData;
-                            
+                            document.getElementById('ocrPreview').src = imageData;
                             progressBar.style.width = '60%';
                             progressBar.innerText = 'Analisi testo...';
-                            
-                            // Avvia OCR sull'immagine estratta
                             performOCR(imageData);
                         });
                     });
@@ -614,26 +671,19 @@
         }
 
         function performOCR(imageData) {
-            Tesseract.recognize(
-                imageData,
-                'ita+eng',
-                {
-                    logger: info => {
-                        if (info.status === 'recognizing text') {
-                            const progress = Math.round(60 + (info.progress * 40)); // Da 60% a 100%
-                            document.getElementById('ocrProgressBar').style.width = progress + '%';
-                            document.getElementById('ocrProgressBar').innerText = progress + '%';
-                        }
+            Tesseract.recognize(imageData, 'ita+eng', {
+                logger: info => {
+                    if (info.status === 'recognizing text') {
+                        const progress = Math.round(60 + (info.progress * 40));
+                        document.getElementById('ocrProgressBar').style.width = progress + '%';
+                        document.getElementById('ocrProgressBar').innerText = progress + '%';
                     }
                 }
-            ).then(({ data: { text } }) => {
+            }).then(({ data: { text } }) => {
                 document.getElementById('ocrProgressContainer').style.display = 'none';
                 document.getElementById('ocrText').innerText = text;
-                
-                // Estrai giocatori dal testo
                 extractedPlayers = parseRosterText(text);
                 displayExtractedPlayers();
-                
                 document.getElementById('ocrResultContainer').style.display = 'block';
             }).catch(err => {
                 alert('Errore nell\'analisi dell\'immagine: ' + err.message);
@@ -642,65 +692,44 @@
         }
 
         function parseRosterText(text) {
-            const lines = text.split('\n');
             const players = [];
-            
-            // Pattern migliorati per trovare numero seguito da nome
             const patterns = [
-                /(\d{1,2})\s+([A-Za-zÀ-ÿ'\-]{2,}\s+[A-Za-zÀ-ÿ'\-]{2,})/g,  // Nome e cognome completo
-                /(\d{1,2})\s*[\.:\-\)]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g,  // Con separatori vari
-                /^(\d{1,2})\s+(.+)$/gm,  // Linee che iniziano con numero
-                /N[°o]?\s*(\d{1,2})\s+([A-Za-zÀ-ÿ'\-\s]{3,})/gi,  // Con "N°" o "No"
-                /(\d{1,2})\s*[-–—]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g  // Trattini vari
+                /(\d{1,2})\s+([A-Za-zÀ-ÿ'\-]{2,}\s+[A-Za-zÀ-ÿ'\-]{2,})/g,
+                /(\d{1,2})\s*[\.:\-\)]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g,
+                /^(\d{1,2})\s+(.+)$/gm,
+                /N[°o]?\s*(\d{1,2})\s+([A-Za-zÀ-ÿ'\-\s]{3,})/gi,
+                /(\d{1,2})\s*[-–—]\s*([A-Za-zÀ-ÿ'\-\s]{3,})/g
             ];
-            
-            // Prova tutti i pattern
             for (const pattern of patterns) {
                 let match;
                 while ((match = pattern.exec(text)) !== null) {
                     const num = match[1].trim();
-                    let name = match[2].trim();
-                    
-                    // Pulisci il nome
-                    name = name
-                        .replace(/\s+/g, ' ')  // Normalizza spazi multipli
-                        .replace(/[^\w\sÀ-ÿ'\-]/g, '')  // Rimuovi caratteri strani
+                    let name = match[2].trim()
+                        .replace(/\s+/g, ' ')
+                        .replace(/[^\w\sÀ-ÿ'\-]/g, '')
                         .trim();
-                    
-                    // Valida il nome
-                    if (name.length >= 3 && 
-                        /^[A-Za-zÀ-ÿ'\-\s]+$/.test(name) &&
+                    if (name.length >= 3 && /^[A-Za-zÀ-ÿ'\-\s]+$/.test(name) &&
                         parseInt(num) >= 0 && parseInt(num) <= 99) {
-                        
-                        // Verifica che non sia già presente
                         if (!players.some(p => p.num === num)) {
                             players.push({ num, name });
                         }
                     }
                 }
             }
-            
-            // Se non trova niente con i pattern, prova analisi riga per riga
             if (players.length === 0) {
-                lines.forEach(line => {
+                text.split('\n').forEach(line => {
                     line = line.trim();
-                    // Cerca numero all'inizio della riga
                     const simpleMatch = line.match(/^(\d{1,2})\s+(.+)$/);
                     if (simpleMatch) {
                         const num = simpleMatch[1];
-                        let name = simpleMatch[2].trim();
-                        name = name.replace(/[^\w\sÀ-ÿ'\-]/g, '').trim();
-                        
+                        let name = simpleMatch[2].trim().replace(/[^\w\sÀ-ÿ'\-]/g, '').trim();
                         if (name.length >= 3 && !players.some(p => p.num === num)) {
                             players.push({ num, name });
                         }
                     }
                 });
             }
-            
-            // Ordina per numero
             players.sort((a, b) => parseInt(a.num) - parseInt(b.num));
-            
             return players;
         }
 
@@ -710,10 +739,8 @@
                 container.innerHTML = '<p style="color: #dc3545;">Nessun giocatore rilevato. Prova a scattare una foto più nitida o inserisci manualmente.</p>';
                 return;
             }
-            
             let html = '<table style="width: 100%; border-collapse: collapse;">';
             html += '<tr><th style="border: 1px solid #ccc; padding: 8px;">N°</th><th style="border: 1px solid #ccc; padding: 8px;">Nome</th><th style="border: 1px solid #ccc; padding: 8px;">Azione</th></tr>';
-            
             extractedPlayers.forEach((player, index) => {
                 html += `<tr>
                     <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><input type="text" value="${player.num}" id="ocrNum${index}" style="width: 50px; text-align: center;"></td>
@@ -721,7 +748,6 @@
                     <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><button onclick="removeOcrPlayer(${index})" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">🗑️</button></td>
                 </tr>`;
             });
-            
             html += '</table>';
             html += '<p style="margin-top: 10px; color: #666; font-size: 14px;"><em>💡 Puoi modificare i dati prima di importare</em></p>';
             container.innerHTML = html;
@@ -733,20 +759,16 @@
         }
 
         function importOcrPlayers() {
-            // Aggiorna i dati dai campi input
             extractedPlayers.forEach((player, index) => {
                 player.num = document.getElementById(`ocrNum${index}`).value.trim();
                 player.name = document.getElementById(`ocrName${index}`).value.trim();
             });
-            
-            // Aggiungi i giocatori al roster
             const rosterContainer = document.getElementById(`roster${currentOcrTeam}`);
             extractedPlayers.forEach(player => {
                 const div = document.createElement('div');
                 div.innerHTML = `<input placeholder="N°" size="3" style="margin: 2px;" value="${player.num}"> <input placeholder="Nome" style="width: 120px; margin: 2px;" value="${player.name}">`;
                 rosterContainer.appendChild(div);
             });
-            
             alert(`✅ ${extractedPlayers.length} giocatori importati per Squadra ${currentOcrTeam}!`);
             closeOcrModal();
         }
@@ -805,16 +827,12 @@
             return res;
         }
 
+        // Chiusura manuale del set (bottone "🏐 Fine Set")
         function nextSet() {
-            if (!confirm(`Chiudere Set ${currentSet}?`)) return;
-            currentSet++;
-            matchData.currentSet = currentSet;
-            score = { A: 0, B: 0 };
-            document.getElementById('scoreA').innerText = 0;
-            document.getElementById('scoreB').innerText = 0;
-            document.getElementById('currentSetLabel').innerText = currentSet;
-            updateLiveStatsUI();
-            saveToLocalStorage();
+            if (!confirm(`Chiudere manualmente il Set ${currentSet}?`)) return;
+            // Nascondi eventuale banner aperto
+            document.getElementById('setEndBanner').classList.remove('visible');
+            advanceSet();
         }
 
         function undoLastAction() {
@@ -833,8 +851,6 @@
 
         function saveToLocalStorage() {
             localStorage.setItem('volleyScout_v15', JSON.stringify({matchData, currentSet, score}));
-            
-            // Feedback visivo di salvataggio
             const indicator = document.getElementById('autoSaveIndicator');
             if (indicator) {
                 indicator.style.color = '#ffc107';
@@ -862,16 +878,13 @@
 
         function exportToExcel() {
             const wb = XLSX.utils.book_new();
-            
-            // Foglio 1: Cronologia con Commenti
             let dCron = [['Set', 'Team', 'Giocatore', 'Azione', 'Punt. A', 'Punt. B', 'Commento']];
             matchData.actions.forEach(a => dCron.push([a.set, a.team, a.playerText, a.type, a.scoreA, a.scoreB, a.comment || '']));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dCron), 'Cronologia');
 
-            // Foglio 2 e 3: Statistiche A e B
             ['A', 'B'].forEach(t => {
                 let dStats = [[`Statistiche Squadra ${t}: ${matchData.teamNames[t]}`], 
-                             ['Num', 'Nome', 'Ace', 'Batt', 'Muro', 'PPT', 'PST', 'PTT', 'EA', 'EB', 'I', 'ED', 'FP', 'EPT', 'EST', 'ETT', 'Punti Tot', 'Errori Tot']];
+                             ['Num', 'Nome', 'A', 'Batt', 'Muro', 'PPT', 'PST', 'PTT', 'EA', 'EB', 'I', 'ED', 'FP', 'EPT', 'EST', 'ETT', 'Punti Tot', 'Errori Tot']];
                 matchData.rosters[t].forEach(p => {
                     const s = getPlayerDeepStats(t, p.num).tot;
                     dStats.push([p.num, p.name, s.A, s.B, s.M, s.PPT, s.PST, s.PTT, s.EA, s.EB, s.I, s.ED, s.FP, s.EPT, s.EST, s.ETT, s.pts, s.err]);
@@ -886,10 +899,7 @@
             const reader = new FileReader();
             reader.onload = e => {
                 let d = JSON.parse(e.target.result);
-                
-                // Migra i dati se necessario
                 d = migrateMatchData(d);
-                
                 matchData = d.matchData; 
                 currentSet = d.currentSet || 1; 
                 score = d.score;
@@ -902,7 +912,6 @@
                 document.getElementById('scoreB').innerText = score.B;
                 document.getElementById('currentSetLabel').innerText = currentSet;
                 
-                // Roster
                 ['A', 'B'].forEach(t => {
                     const sel = document.getElementById(`player${t}`);
                     sel.innerHTML = '';
@@ -925,7 +934,6 @@
                 document.getElementById('fileName').innerText = matchFileName;
                 
                 updateLiveStatsUI();
-                
                 alert('✅ Partita caricata e aggiornata alla versione corrente!');
             };
             reader.readAsText(event.target.files[0]);
@@ -951,44 +959,28 @@
         function showInfo() { document.getElementById('infoModal').style.display = 'block'; }
         function closeInfo() { document.getElementById('infoModal').style.display = 'none'; }
         
-        // Salvataggio automatico prima della chiusura della finestra
         window.addEventListener('beforeunload', function(e) {
             if (matchData.actions.length > 0) {
-                // Salva automaticamente nel localStorage
                 saveToLocalStorage();
-                
-                // Mostra avviso di conferma
                 e.preventDefault();
                 e.returnValue = 'Hai una partita in corso. I dati sono salvati automaticamente in locale. Vuoi davvero uscire?';
                 return e.returnValue;
             }
         });
 
-        // Caricamento automatico da localStorage se presente
         window.onload = () => {
-            // Prova prima v1.5, poi v1.4 per compatibilità
             let saved = localStorage.getItem('volleyScout_v15');
             let isOldVersion = false;
-            
             if (!saved) {
-                // Prova a caricare la vecchia versione
                 saved = localStorage.getItem('volleyScout_v14');
-                if (saved) {
-                    isOldVersion = true;
-                    console.log('⚠️ Rilevata sessione dalla versione 1.4');
-                }
+                if (saved) { isOldVersion = true; }
             }
-            
             if (saved && confirm('Recuperare ultima sessione?')) {
                 let d = JSON.parse(saved);
-                
-                // Migra i dati se necessario
                 d = migrateMatchData(d);
-                
                 matchData = d.matchData; 
                 currentSet = d.currentSet; 
                 score = d.score;
-                
                 startMatch();
                 document.getElementById('currentSetLabel').innerText = currentSet;
                 document.getElementById('scoreA').innerText = score.A;
@@ -996,15 +988,11 @@
                 const tl = document.getElementById('timeline');
                 tl.innerHTML = '';
                 matchData.actions.forEach((action, index) => renderTimelineItem(action, index));
-                
                 if (isOldVersion) {
-                    // Rimuovi la vecchia versione e salva nella nuova
                     localStorage.removeItem('volleyScout_v14');
                     saveToLocalStorage();
-                    alert('✅ Sessione recuperata e aggiornata alla versione 1.5!\n\nOra puoi usare le nuove funzionalità (PPT, PST, PTT, EPT, EST, ETT, commenti e OCR roster).');
+                    alert('✅ Sessione recuperata e aggiornata alla versione 1.5!');
                 }
-                
-                console.log('✅ Sessione recuperata e aggiornata alla versione corrente');
             }
         };
     </script>
